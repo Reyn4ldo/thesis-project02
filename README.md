@@ -67,53 +67,81 @@ Visualize hidden structures:
 - Hypothesis testing
 - Feature importance with SHAP values
 
-## Installation
+## Quick Start
+
+### Installation & Setup
 
 ```bash
 # Clone repository
 git clone https://github.com/Reyn4ldo/thesis-project02.git
 cd thesis-project02
 
-# Install dependencies
+# Run automated setup (recommended)
+bash setup_and_test.sh
+
+# OR manual setup:
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-## Usage
+### Running the Complete Pipeline
 
-### 1. Data Preprocessing
 ```bash
+# Execute all analysis phases automatically
+python run_pipeline.py
+```
+
+This will run all phases in sequence:
+1. ✓ Data Cleaning
+2. ✓ Feature Engineering
+3. ✓ Classification (6 algorithms)
+4. ✓ Clustering (k-Means, Hierarchical, DBSCAN)
+5. ✓ Association Rule Mining (Apriori, FP-Growth)
+6. ✓ Dimensionality Reduction (PCA, t-SNE, UMAP)
+7. ✓ Statistical Analysis
+
+### Launch Interactive Dashboard
+
+```bash
+# Start Streamlit dashboard
+streamlit run src/deployment/app.py
+```
+
+Open browser to `http://localhost:8501` to explore results interactively.
+
+### Generate Final Report
+
+```bash
+# Create comprehensive analysis report
+python generate_report.py
+```
+
+This generates `FINAL_REPORT.md` with all findings and recommendations.
+
+## Running Individual Modules
+
+If you prefer to run specific analyses:
+
+```bash
+# Data preprocessing only
 python src/preprocessing/clean_data.py
 python src/preprocessing/feature_engineering.py
-```
 
-### 2. Run Classification Models
-```bash
+# Classification only
 python src/classification/train_models.py
-```
 
-### 3. Perform Clustering Analysis
-```bash
+# Clustering only
 python src/clustering/cluster_analysis.py
-```
 
-### 4. Mine Association Rules
-```bash
+# Association rules only
 python src/association_rules/mine_rules.py
-```
 
-### 5. Generate Visualizations
-```bash
+# Visualizations only
 python src/dimensionality_reduction/visualize.py
-```
 
-### 6. Run Statistical Analysis
-```bash
+# Statistical analysis only
 python src/statistical_analysis/analyze.py
-```
-
-### 7. Launch Dashboard
-```bash
-streamlit run src/deployment/app.py
 ```
 
 ## Dashboard Features
@@ -125,13 +153,41 @@ streamlit run src/deployment/app.py
 - 📥 Downloadable analysis reports
 
 ## Docker Deployment
+
+### Option 1: Docker CLI
+
 ```bash
 # Build image
 docker build -t antibiotic-resistance-ml .
 
 # Run container
 docker run -p 8501:8501 antibiotic-resistance-ml
+
+# Access dashboard at http://localhost:8501
 ```
+
+### Option 2: Docker Compose (Recommended)
+
+```bash
+# Start application
+docker-compose up -d
+
+# View logs
+docker-compose logs -f
+
+# Stop application
+docker-compose down
+```
+
+### Cloud Deployment
+
+The Docker container can be deployed to:
+- **AWS**: ECS, EKS, or EC2
+- **Azure**: Container Instances or AKS
+- **GCP**: Cloud Run or GKE
+- **Heroku**: Container Registry
+
+See `USAGE_GUIDE.md` for detailed deployment instructions.
 
 ## Key Findings
 (To be updated after analysis)
