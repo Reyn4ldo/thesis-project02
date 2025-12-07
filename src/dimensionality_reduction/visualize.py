@@ -106,7 +106,7 @@ class DimensionalityReducer:
             n_components=n_components,
             perplexity=perplexity,
             random_state=42,
-            n_iter=1000
+            max_iter=1000
         )
         self.embeddings['tsne'] = self.models['tsne'].fit_transform(self.X_scaled)
         
@@ -205,6 +205,8 @@ class DimensionalityReducer:
         plt.tight_layout()
         
         if output_path:
+            # Ensure output directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             logger.info(f"Saved to {output_path}")
         
@@ -260,6 +262,8 @@ class DimensionalityReducer:
         plt.tight_layout()
         
         if output_path:
+            # Ensure output directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             logger.info(f"Saved to {output_path}")
         
@@ -296,6 +300,8 @@ class DimensionalityReducer:
         plt.tight_layout()
         
         if output_path:
+            # Ensure output directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             logger.info(f"Saved to {output_path}")
         
@@ -344,6 +350,8 @@ class DimensionalityReducer:
         plt.tight_layout()
         
         if output_path:
+            # Ensure output directory exists
+            output_path.parent.mkdir(parents=True, exist_ok=True)
             plt.savefig(output_path, dpi=300, bbox_inches='tight')
             logger.info(f"Saved to {output_path}")
         
