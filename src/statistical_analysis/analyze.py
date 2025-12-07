@@ -446,9 +446,9 @@ def main():
              .create_species_resistance_heatmap(results_dir / 'species_resistance_heatmap.png')
              .save_results(results_dir))
     
-    # Calculate SHAP values if model available
-    if model_path:
-        analyzer.calculate_shap_values(model_path, sample_size=100)
+    # Calculate SHAP values if model available (disabled due to stability issues)
+    # if model_path:
+    #     analyzer.calculate_shap_values(model_path, sample_size=100)
     
     logger.info("\n✓ Statistical analysis completed successfully!")
 
