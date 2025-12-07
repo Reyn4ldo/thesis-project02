@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  antibiotic-resistance-app:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./src:/app/src
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
