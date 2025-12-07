@@ -283,15 +283,12 @@ class FeatureEngineer:
         
         # Second split: separate validation from training
         val_size_adjusted = val_size / (1 - test_size)  # Adjust val_size for remaining data
-        stratify_col_val = None
-        if stratify_col is not None:
-            stratify_col_val = train_val['bacterial_species']
         
         train, val = train_test_split(
             train_val,
             test_size=val_size_adjusted,
             random_state=random_state,
-            stratify=stratify_col_val
+            stratify=train_val['bacterial_species'] if stratify_col is not None else None
         )
         
         logger.info(f"Split sizes: Train={len(train)} ({100*len(train)/len(self.features_data):.1f}%), "

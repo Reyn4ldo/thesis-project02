@@ -266,6 +266,10 @@ class StatisticalAnalyzer:
         """
         Calculate SHAP values for feature importance
         
+        NOTE: This method is currently disabled in the main() function due to 
+        stability issues causing segmentation faults with certain model types.
+        Consider using LIME or other interpretability methods as alternatives.
+        
         Args:
             model_path: Path to trained model
             sample_size: Number of samples for SHAP analysis
