@@ -265,21 +265,33 @@ class FeatureEngineer:
         """
         logger.info("Creating train/validation/test splits...")
         
+        # Check if stratification is possible (no NaN values in bacterial_species)
+        stratify_col = None
+        if 'bacterial_species' in self.features_data.columns:
+            if not self.features_data['bacterial_species'].isna().any():
+                stratify_col = self.features_data['bacterial_species']
+            else:
+                logger.warning("bacterial_species contains NaN values, stratification disabled")
+        
         # First split: separate test set
         train_val, test = train_test_split(
             self.features_data,
             test_size=test_size,
             random_state=random_state,
-            stratify=self.features_data['bacterial_species'] if 'bacterial_species' in self.features_data.columns else None
+            stratify=stratify_col
         )
         
         # Second split: separate validation from training
         val_size_adjusted = val_size / (1 - test_size)  # Adjust val_size for remaining data
+        stratify_col_val = None
+        if stratify_col is not None:
+            stratify_col_val = train_val['bacterial_species']
+        
         train, val = train_test_split(
             train_val,
             test_size=val_size_adjusted,
             random_state=random_state,
-            stratify=train_val['bacterial_species'] if 'bacterial_species' in train_val.columns else None
+            stratify=stratify_col_val
         )
         
         logger.info(f"Split sizes: Train={len(train)} ({100*len(train)/len(self.features_data):.1f}%), "

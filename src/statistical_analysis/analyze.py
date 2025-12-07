@@ -292,8 +292,11 @@ class StatisticalAnalyzer:
             
             # Create SHAP explainer
             if hasattr(model, 'predict_proba'):
-                explainer = shap.TreeExplainer(model)
-                shap_values = explainer.shap_values(X)
+                # Use a smaller sample size to avoid memory issues
+                X_sample = X.sample(min(50, len(X)), random_state=42)
+                
+                explainer = shap.TreeExplainer(model, feature_perturbation='interventional')
+                shap_values = explainer.shap_values(X_sample, check_additivity=False)
                 
                 # For multi-class, take mean across classes
                 if isinstance(shap_values, list):
@@ -302,7 +305,7 @@ class StatisticalAnalyzer:
                 self.shap_values['model'] = {
                     'shap_values': shap_values,
                     'feature_names': feature_cols,
-                    'X': X
+                    'X': X_sample
                 }
                 
                 # Calculate mean absolute SHAP values
@@ -352,6 +355,9 @@ class StatisticalAnalyzer:
         )
         plt.title('Antibiotic Co-Resistance Correlation Matrix', fontsize=14, pad=20)
         plt.tight_layout()
+        
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
         
@@ -384,6 +390,9 @@ class StatisticalAnalyzer:
         plt.xlabel('Antibiotic')
         plt.ylabel('Species')
         plt.tight_layout()
+        
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
         

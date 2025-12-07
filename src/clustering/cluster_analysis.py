@@ -281,6 +281,9 @@ class ResistanceClusterer:
         plt.xlabel('Sample Index')
         plt.ylabel('Distance')
         plt.tight_layout()
+        
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
         
@@ -316,6 +319,9 @@ class ResistanceClusterer:
         plt.xlabel('Antibiotic')
         plt.ylabel('Cluster')
         plt.tight_layout()
+        
+        # Ensure output directory exists
+        output_path.parent.mkdir(parents=True, exist_ok=True)
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
         
