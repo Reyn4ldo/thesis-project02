@@ -95,13 +95,18 @@ class AntibioticResistanceDashboard:
         for col in mic_columns:
             mic_values = data[col].astype(str)
             
-            # Clean MIC values
+            # Clean MIC values - remove comparison operators and special characters
             mic_numeric = []
             for val in mic_values:
-                val = str(val).replace('≤', '').replace('≥', '').replace('*', '').replace('<=', '').replace('>=', '').strip()
+                # Remove common MIC prefixes/suffixes using regex-like replacements
+                cleaned_val = val
+                for char in ['≤', '≥', '*', '<=', '>=']:
+                    cleaned_val = cleaned_val.replace(char, '')
+                cleaned_val = cleaned_val.strip()
+                
                 try:
-                    mic_numeric.append(float(val))
-                except:
+                    mic_numeric.append(float(cleaned_val))
+                except (ValueError, TypeError):
                     mic_numeric.append(np.nan)
             
             # Create log-transformed column
