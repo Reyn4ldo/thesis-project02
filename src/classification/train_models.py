@@ -1,6 +1,7 @@
 """
-Classification Module
+Classification Module - Enhanced
 Implements 6 supervised learning algorithms for antibiotic resistance prediction
+with progress tracking and improved performance
 """
 
 import pandas as pd
@@ -21,6 +22,7 @@ from sklearn.preprocessing import label_binarize
 import xgboost as xgb
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tqdm import tqdm
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -170,20 +172,25 @@ class AntibioticClassifier:
         return self
     
     def train_models(self):
-        """Train all models"""
+        """Train all models with progress tracking"""
         logger.info("Training models...")
         
         self.trained_models = {}
         
-        for name, model in self.models.items():
-            logger.info(f"\nTraining {name}...")
-            try:
-                model.fit(self.X_train, self.y_train)
-                self.trained_models[name] = model
-                logger.info(f"✓ {name} training complete")
-            except Exception as e:
-                logger.error(f"✗ Error training {name}: {str(e)}")
+        # Use tqdm for progress bar
+        with tqdm(total=len(self.models), desc="Training Progress", unit="model") as pbar:
+            for name, model in self.models.items():
+                logger.info(f"\nTraining {name}...")
+                try:
+                    model.fit(self.X_train, self.y_train)
+                    self.trained_models[name] = model
+                    logger.info(f"✓ {name} training complete")
+                except Exception as e:
+                    logger.error(f"✗ Error training {name}: {str(e)}")
+                finally:
+                    pbar.update(1)
         
+        logger.info(f"\nSuccessfully trained {len(self.trained_models)}/{len(self.models)} models")
         return self
     
     def evaluate_models(self):
