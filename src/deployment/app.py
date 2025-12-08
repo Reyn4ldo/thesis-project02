@@ -15,6 +15,13 @@ import sys
 # Add parent directory to path
 sys.path.append(str(Path(__file__).parent.parent))
 
+# Import custom modules
+try:
+    from data_quality import DataQualityChecker, quick_quality_check
+except ImportError:
+    DataQualityChecker = None
+    quick_quality_check = None
+
 # Page configuration
 st.set_page_config(
     page_title="Antibiotic Resistance Analysis",
@@ -261,6 +268,118 @@ class AntibioticResistanceDashboard:
                         color=mdr_counts.index,
                         color_discrete_map={'non-mdr': 'green', 'mdr': 'orange', 'high-mdr': 'red'})
             st.plotly_chart(fig, use_container_width=True)
+    
+    def render_data_quality(self):
+        """Render data quality checks"""
+        st.markdown('<h2 class="sub-header">✅ Data Quality Assessment</h2>', unsafe_allow_html=True)
+        
+        if self.data is None:
+            st.error("Data not found. Please run preprocessing first.")
+            return
+        
+        if DataQualityChecker is None:
+            st.error("Data quality module not available. Please check installation.")
+            return
+        
+        st.info("Analyzing data quality... This may take a moment for large datasets.")
+        
+        # Run quality checks
+        checker = DataQualityChecker(self.data, "Processed Dataset")
+        report = checker.check_all()
+        
+        # Display quality score
+        st.markdown("### Overall Quality Score")
+        quality_score = report['quality_score']
+        
+        # Color code based on score
+        if quality_score >= 90:
+            score_color = "green"
+            score_emoji = "🌟"
+        elif quality_score >= 70:
+            score_color = "orange"
+            score_emoji = "⚠️"
+        else:
+            score_color = "red"
+            score_emoji = "🚨"
+        
+        st.markdown(f"""
+        <div style='text-align: center; padding: 20px; background-color: #f0f2f6; border-radius: 10px;'>
+            <h1 style='color: {score_color}; margin: 0;'>{score_emoji} {quality_score:.1f}/100</h1>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Dataset overview
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Rows", f"{report['total_rows']:,}")
+        with col2:
+            st.metric("Total Columns", report['total_columns'])
+        with col3:
+            st.metric("Issues Found", len(report['issues']) + len(report['warnings']))
+        
+        # Critical Issues
+        if report['issues']:
+            st.markdown("### 🚨 Critical Issues")
+            for issue in report['issues']:
+                with st.expander(f"❗ {issue['message']}", expanded=True):
+                    st.write(f"**Severity:** {issue['severity']}")
+                    if 'columns' in issue:
+                        st.write(f"**Affected Columns:** {len(issue['columns'])}")
+                        if st.checkbox(f"Show affected columns ({issue['type']})", key=f"show_{issue['type']}"):
+                            st.write(issue['columns'])
+                    if 'details' in issue:
+                        st.json(issue['details'])
+                    if 'recommendation' in issue:
+                        st.info(f"💡 Recommendation: {issue['recommendation']}")
+        else:
+            st.success("✓ No critical issues found!")
+        
+        # Warnings
+        if report['warnings']:
+            st.markdown("### ⚠️ Warnings")
+            for warning in report['warnings']:
+                with st.expander(f"⚠️ {warning['message']}"):
+                    st.write(f"**Severity:** {warning['severity']}")
+                    if 'columns' in warning:
+                        st.write(f"**Affected Columns:** {len(warning['columns'])}")
+                        if len(warning['columns']) <= 10:
+                            st.write(warning['columns'])
+                    if 'details' in warning:
+                        if isinstance(warning['details'], dict):
+                            st.json(warning['details'])
+                        else:
+                            st.write(warning['details'])
+                    if 'recommendation' in warning:
+                        st.info(f"💡 Recommendation: {warning['recommendation']}")
+        
+        # Information
+        if report['info']:
+            st.markdown("### ℹ️ Information")
+            for info in report['info']:
+                with st.expander(f"ℹ️ {info['message']}"):
+                    if 'details' in info:
+                        if isinstance(info['details'], list):
+                            for detail in info['details'][:10]:  # Show first 10
+                                if isinstance(detail, dict):
+                                    st.json(detail)
+                                else:
+                                    st.write(detail)
+                            if len(info['details']) > 10:
+                                st.write(f"... and {len(info['details']) - 10} more")
+                        else:
+                            st.json(info['details'])
+                    if 'note' in info:
+                        st.caption(info['note'])
+        
+        # Download report
+        st.markdown("### 📥 Download Report")
+        report_text = checker.get_summary_text()
+        st.download_button(
+            label="Download Quality Report",
+            data=report_text,
+            file_name="data_quality_report.txt",
+            mime="text/plain"
+        )
     
     def render_classification(self):
         """Render classification results"""
@@ -732,6 +851,7 @@ class AntibioticResistanceDashboard:
         pages = {
             "🏠 Home": self.render_home,
             "📈 Data Overview": self.render_data_overview,
+            "✅ Data Quality": self.render_data_quality,
             "🎯 Classification": self.render_classification,
             "🔍 Clustering": self.render_clustering,
             "🔗 Association Rules": self.render_association_rules,
