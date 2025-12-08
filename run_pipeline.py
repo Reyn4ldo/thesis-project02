@@ -7,13 +7,18 @@ import sys
 from pathlib import Path
 import logging
 import time
+import traceback
 
 # Setup logging
+# Ensure log file can be created (current directory should exist, but being defensive)
+log_dir = Path(__file__).parent
+log_dir.mkdir(parents=True, exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('pipeline.log'),
+        logging.FileHandler(log_dir / 'pipeline.log'),
         logging.StreamHandler()
     ]
 )
@@ -33,7 +38,6 @@ def run_phase(phase_name, module_path, function_name='main'):
     
     try:
         # Import and run module
-        module_parts = module_path.split('.')
         module = __import__(module_path, fromlist=[function_name])
         main_func = getattr(module, function_name)
         
@@ -46,7 +50,6 @@ def run_phase(phase_name, module_path, function_name='main'):
     except Exception as e:
         elapsed = time.time() - start_time
         logger.error(f"✗ Phase failed after {elapsed:.2f} seconds: {str(e)}")
-        import traceback
         traceback.print_exc()
         return False
 
@@ -60,8 +63,8 @@ def main():
     pipeline_start = time.time()
     
     phases = [
-        ("Phase 2.1: Data Cleaning", "preprocessing.clean_data"),
-        ("Phase 2.2: Feature Engineering", "preprocessing.feature_engineering"),
+        ("Phase 1: Data Cleaning", "preprocessing.clean_data"),
+        ("Phase 2: Feature Engineering", "preprocessing.feature_engineering"),
         ("Phase 3: Classification", "classification.train_models"),
         ("Phase 4: Clustering", "clustering.cluster_analysis"),
         ("Phase 5: Association Rule Mining", "association_rules.mine_rules"),
@@ -98,8 +101,10 @@ def main():
     if successful == total:
         logger.info("\n🎉 All phases completed successfully!")
         logger.info("\n📊 To view results, run: streamlit run src/deployment/app.py")
+        sys.exit(0)
     else:
         logger.warning(f"\n⚠️ {total - successful} phase(s) failed. Check logs for details.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
