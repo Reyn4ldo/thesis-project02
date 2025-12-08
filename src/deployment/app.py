@@ -462,7 +462,6 @@ class AntibioticResistanceDashboard:
                     st.dataframe(user_data.head())
                 
                 # Check if models are available
-                models_dir = self.base_path / 'data' / 'models'
                 results_dir = self.base_path / 'data' / 'results'
                 
                 available_models = []
@@ -494,12 +493,20 @@ class AntibioticResistanceDashboard:
                             if train_file.exists():
                                 train_data = pd.read_csv(train_file)
                                 
+                                # Determine target column for this task
+                                target_mapping = {
+                                    'species': 'bacterial_species_encoded',
+                                    'susceptibility': 'ampicillin_int',
+                                    'mar_class': 'mar_class'
+                                }
+                                target_column = target_mapping.get(task)
+                                
                                 # Get feature columns (same logic as in training)
                                 feature_cols = []
                                 
-                                # Add encoded features
+                                # Add encoded features (excluding target)
                                 feature_cols.extend([col for col in train_data.columns if col.endswith('_encoded') 
-                                                   and col not in ['bacterial_species_encoded']])
+                                                   and col != target_column])
                                 
                                 # Add resistant features
                                 feature_cols.extend([col for col in train_data.columns if col.endswith('_resistant')])
@@ -515,7 +522,10 @@ class AntibioticResistanceDashboard:
                                 # Prepare user data with same features
                                 missing_cols = set(feature_cols) - set(user_data.columns)
                                 if missing_cols:
-                                    st.warning(f"⚠️ Missing columns in uploaded data: {', '.join(list(missing_cols)[:5])}...")
+                                    # Show first 5 missing columns as sample
+                                    sample_size = 5
+                                    sample_missing = list(missing_cols)[:sample_size]
+                                    st.warning(f"⚠️ Missing columns in uploaded data: {', '.join(sample_missing)}...")
                                     st.info("The model will use zero values for missing features.")
                                     for col in missing_cols:
                                         user_data[col] = 0
@@ -530,7 +540,8 @@ class AntibioticResistanceDashboard:
                                 try:
                                     pred_proba = model.predict_proba(X_user)
                                     confidence = pred_proba.max(axis=1)
-                                except:
+                                except (AttributeError, NotImplementedError):
+                                    # Model doesn't support predict_proba
                                     confidence = None
                                 
                                 # Decode predictions
