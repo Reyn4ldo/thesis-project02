@@ -289,7 +289,13 @@ class AntibioticResistanceDashboard:
         # Method selection
         method = st.selectbox("Select Algorithm", ["Apriori", "FP-Growth"])
         
-        rules_file = assoc_dir / f'{method.lower()}_rules.csv'
+        # Map display name to file name
+        method_file_map = {
+            'apriori': 'apriori',
+            'fp-growth': 'fpgrowth'
+        }
+        file_method = method_file_map.get(method.lower(), method.lower())
+        rules_file = assoc_dir / f'{file_method}_rules.csv'
         
         if rules_file.exists():
             rules = pd.read_csv(rules_file)
@@ -455,8 +461,146 @@ class AntibioticResistanceDashboard:
                 with st.expander("Preview Uploaded Data"):
                     st.dataframe(user_data.head())
                 
-                st.warning("⚠️ Note: Prediction functionality requires trained models. "
-                          "Please ensure preprocessing and model training are complete.")
+                # Check if models are available
+                models_dir = self.base_path / 'data' / 'models'
+                results_dir = self.base_path / 'data' / 'results'
+                
+                available_models = []
+                for task in ['species', 'mar_class', 'susceptibility']:
+                    model_file = results_dir / f'best_model_{task}.pkl'
+                    if model_file.exists():
+                        available_models.append(task)
+                
+                if not available_models:
+                    st.warning("⚠️ Note: Prediction functionality requires trained models. "
+                              "Please ensure preprocessing and model training are complete.")
+                    st.info("Run `python run_pipeline.py` to train models first.")
+                    return
+                
+                # Task selection
+                st.subheader("Select Prediction Task")
+                task = st.selectbox("Task", available_models, 
+                                   format_func=lambda x: x.replace('_', ' ').title())
+                
+                if st.button("🔮 Make Predictions"):
+                    with st.spinner("Making predictions..."):
+                        try:
+                            # Load model
+                            model_file = results_dir / f'best_model_{task}.pkl'
+                            model = joblib.load(model_file)
+                            
+                            # Load feature columns from training data
+                            train_file = self.base_path / 'data' / 'processed' / 'splits' / 'train.csv'
+                            if train_file.exists():
+                                train_data = pd.read_csv(train_file)
+                                
+                                # Get feature columns (same logic as in training)
+                                feature_cols = []
+                                
+                                # Add encoded features
+                                feature_cols.extend([col for col in train_data.columns if col.endswith('_encoded') 
+                                                   and col not in ['bacterial_species_encoded']])
+                                
+                                # Add resistant features
+                                feature_cols.extend([col for col in train_data.columns if col.endswith('_resistant')])
+                                
+                                # Add MIC features
+                                feature_cols.extend([col for col in train_data.columns if col.endswith('_mic_log')])
+                                
+                                # Add derived features
+                                derived_cols = ['mdr_score', 'mdr_percentage', 'esbl_positive', 
+                                              'site_sample_count', 'source_sample_count']
+                                feature_cols.extend([col for col in derived_cols if col in train_data.columns])
+                                
+                                # Prepare user data with same features
+                                missing_cols = set(feature_cols) - set(user_data.columns)
+                                if missing_cols:
+                                    st.warning(f"⚠️ Missing columns in uploaded data: {', '.join(list(missing_cols)[:5])}...")
+                                    st.info("The model will use zero values for missing features.")
+                                    for col in missing_cols:
+                                        user_data[col] = 0
+                                
+                                # Select and order features
+                                X_user = user_data[feature_cols].fillna(0)
+                                
+                                # Make predictions
+                                predictions = model.predict(X_user)
+                                
+                                # Get prediction probabilities if available
+                                try:
+                                    pred_proba = model.predict_proba(X_user)
+                                    confidence = pred_proba.max(axis=1)
+                                except:
+                                    confidence = None
+                                
+                                # Decode predictions
+                                if task == 'mar_class':
+                                    # Load label encoder
+                                    label_map = {0: 'low', 1: 'medium', 2: 'high'}
+                                    pred_labels = [label_map.get(p, p) for p in predictions]
+                                elif task == 'susceptibility':
+                                    sir_map = {0: 'S', 1: 'I', 2: 'R'}
+                                    pred_labels = [sir_map.get(p, p) for p in predictions]
+                                elif task == 'species':
+                                    # For species, predictions are already numeric codes
+                                    # Try to map back to species names if possible
+                                    if 'bacterial_species' in train_data.columns:
+                                        species_map = dict(zip(train_data['bacterial_species_encoded'], 
+                                                             train_data['bacterial_species']))
+                                        pred_labels = [species_map.get(p, f'Species_{p}') for p in predictions]
+                                    else:
+                                        pred_labels = [f'Species_{p}' for p in predictions]
+                                else:
+                                    pred_labels = predictions
+                                
+                                # Display results
+                                st.success("✓ Predictions complete!")
+                                
+                                results_df = pd.DataFrame({
+                                    'Sample_Index': range(len(predictions)),
+                                    'Prediction': pred_labels
+                                })
+                                
+                                if confidence is not None:
+                                    results_df['Confidence'] = [f"{c:.2%}" for c in confidence]
+                                
+                                st.subheader("Prediction Results")
+                                st.dataframe(results_df)
+                                
+                                # Download results
+                                csv = results_df.to_csv(index=False)
+                                st.download_button(
+                                    label="📥 Download Predictions (CSV)",
+                                    data=csv,
+                                    file_name=f"predictions_{task}.csv",
+                                    mime="text/csv"
+                                )
+                                
+                                # Show summary statistics
+                                st.subheader("Prediction Summary")
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    st.write("**Distribution of Predictions:**")
+                                    pred_counts = pd.Series(pred_labels).value_counts()
+                                    fig = px.bar(x=pred_counts.index, y=pred_counts.values,
+                                               labels={'x': task.replace('_', ' ').title(), 'y': 'Count'})
+                                    st.plotly_chart(fig, use_container_width=True)
+                                
+                                with col2:
+                                    if confidence is not None:
+                                        st.write("**Confidence Distribution:**")
+                                        st.write(f"Mean Confidence: {confidence.mean():.2%}")
+                                        st.write(f"Min Confidence: {confidence.min():.2%}")
+                                        st.write(f"Max Confidence: {confidence.max():.2%}")
+                                
+                            else:
+                                st.error("Training data not found. Cannot determine required features.")
+                        
+                        except Exception as e:
+                            st.error(f"Error making predictions: {str(e)}")
+                            import traceback
+                            st.code(traceback.format_exc())
                 
             except Exception as e:
                 st.error(f"Error loading file: {str(e)}")
