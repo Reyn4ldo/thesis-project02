@@ -74,6 +74,10 @@ class AntibioticResistanceDashboard:
         Returns:
             DataFrame with engineered features
         """
+        # Constants for MIC log transformation
+        MIN_MIC_VALUE = 0.001  # Minimum value to avoid log(0), represents detection limit
+        DEFAULT_LOG_MIC = 0  # Default value when all MIC values are invalid
+        
         data = user_data.copy()
         
         # 1. Encode S/I/R interpretations to numerical values
@@ -104,16 +108,20 @@ class AntibioticResistanceDashboard:
                     cleaned_val = cleaned_val.replace(char, '')
                 cleaned_val = cleaned_val.strip()
                 
-                try:
-                    mic_numeric.append(float(cleaned_val))
-                except (ValueError, TypeError):
+                # Skip empty strings and convert to float
+                if not cleaned_val or cleaned_val.lower() in ['nan', 'na', 'none']:
                     mic_numeric.append(np.nan)
+                else:
+                    try:
+                        mic_numeric.append(float(cleaned_val))
+                    except (ValueError, TypeError):
+                        mic_numeric.append(np.nan)
             
             # Create log-transformed column
             new_col = col.replace('_mic', '_mic_log')
-            log_values = np.log2(pd.Series(mic_numeric).replace(0, 0.001))
+            log_values = np.log2(pd.Series(mic_numeric).replace(0, MIN_MIC_VALUE))
             median_val = log_values.median()
-            data[new_col] = log_values.fillna(median_val if not pd.isna(median_val) else 0)
+            data[new_col] = log_values.fillna(median_val if not pd.isna(median_val) else DEFAULT_LOG_MIC)
         
         # 4. Calculate MDR score
         resistant_columns = [col for col in data.columns if col.endswith('_resistant')]
@@ -122,6 +130,8 @@ class AntibioticResistanceDashboard:
             data['mdr_percentage'] = (data['mdr_score'] / len(resistant_columns) * 100)
         
         # 5. Encode categorical features
+        # Note: Using categorical codes provides consistent encoding within uploaded dataset
+        # For production use, consider using pre-trained label encoders for cross-dataset consistency
         categorical_cols = ['bacterial_species', 'administrative_region', 'national_site', 
                           'local_site', 'sample_source', 'esbl']
         
