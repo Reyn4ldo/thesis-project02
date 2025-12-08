@@ -15,16 +15,22 @@ class DataQualityChecker:
     Check data quality and provide warnings/recommendations
     """
     
-    def __init__(self, df: pd.DataFrame, name: str = "Dataset"):
+    # Default numeric column patterns (can be overridden)
+    DEFAULT_NUMERIC_PATTERNS = ['int', 'mic', 'score', 'index', 'count', 'percentage', 'log']
+    
+    def __init__(self, df: pd.DataFrame, name: str = "Dataset", 
+                 numeric_patterns: List[str] = None):
         """
         Initialize quality checker
         
         Args:
             df: DataFrame to check
             name: Name of the dataset for reporting
+            numeric_patterns: List of substrings indicating numeric columns (optional)
         """
         self.df = df
         self.name = name
+        self.numeric_patterns = numeric_patterns or self.DEFAULT_NUMERIC_PATTERNS
         self.issues = []
         self.warnings = []
         self.info = []
@@ -105,8 +111,9 @@ class DataQualityChecker:
         type_issues = []
         
         for col in self.df.columns:
-            # Check if numeric columns have non-numeric values
-            if 'int' in col or 'mic' in col or 'score' in col or 'index' in col:
+            # Check if numeric columns have non-numeric values based on patterns
+            col_lower = col.lower()
+            if any(pattern in col_lower for pattern in self.numeric_patterns):
                 if self.df[col].dtype == 'object':
                     type_issues.append({
                         'column': col,

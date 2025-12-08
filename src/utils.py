@@ -6,11 +6,13 @@ import functools
 import hashlib
 import json
 import pickle
+import time
 from pathlib import Path
 from typing import Any, Callable, Optional, Dict
 import logging
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from tqdm import tqdm
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -239,9 +241,6 @@ class Timer:
         return False
 
 
-import time  # Add missing import
-
-
 def validate_dataframe(df, required_columns: list = None, 
                        min_rows: int = 1, name: str = "DataFrame") -> bool:
     """
@@ -259,8 +258,6 @@ def validate_dataframe(df, required_columns: list = None,
     Raises:
         ValueError: If validation fails
     """
-    import pandas as pd
-    
     if not isinstance(df, pd.DataFrame):
         raise ValueError(f"{name} must be a pandas DataFrame")
     
