@@ -64,6 +64,103 @@ class AntibioticResistanceDashboard:
         if self.data_path.exists():
             self.data = pd.read_csv(self.data_path)
     
+    def engineer_uploaded_features(self, user_data):
+        """
+        Apply feature engineering to uploaded data
+        
+        Args:
+            user_data: Raw uploaded DataFrame
+            
+        Returns:
+            DataFrame with engineered features
+        """
+        # Constants for MIC log transformation
+        MIN_MIC_VALUE = 0.001  # Minimum value to avoid log(0), represents detection limit
+        DEFAULT_LOG_MIC = 0  # Default value when all MIC values are invalid
+        
+        data = user_data.copy()
+        
+        # 1. Encode S/I/R interpretations to numerical values
+        int_columns = [col for col in data.columns if col.endswith('_int')]
+        sir_mapping = {'S': 0, 'I': 1, 'R': 2, 'U': -1}
+        
+        for col in int_columns:
+            new_col = col.replace('_int', '_encoded')
+            data[new_col] = data[col].map(sir_mapping).fillna(-1)
+        
+        # 2. Create binary resistance flags (R=1, others=0)
+        for col in int_columns:
+            new_col = col.replace('_int', '_resistant')
+            data[new_col] = (data[col] == 'R').astype(int)
+        
+        # 3. Normalize MIC values to log scale
+        mic_columns = [col for col in data.columns if col.endswith('_mic')]
+        
+        for col in mic_columns:
+            mic_values = data[col].astype(str)
+            
+            # Clean MIC values - remove comparison operators and special characters
+            mic_numeric = []
+            for val in mic_values:
+                # Remove common MIC prefixes/suffixes using regex-like replacements
+                cleaned_val = val
+                for char in ['≤', '≥', '*', '<=', '>=']:
+                    cleaned_val = cleaned_val.replace(char, '')
+                cleaned_val = cleaned_val.strip()
+                
+                # Skip empty strings and convert to float
+                if not cleaned_val or cleaned_val.lower() in ['nan', 'na', 'none']:
+                    mic_numeric.append(np.nan)
+                else:
+                    try:
+                        mic_numeric.append(float(cleaned_val))
+                    except (ValueError, TypeError):
+                        mic_numeric.append(np.nan)
+            
+            # Create log-transformed column
+            new_col = col.replace('_mic', '_mic_log')
+            log_values = np.log2(pd.Series(mic_numeric).replace(0, MIN_MIC_VALUE))
+            median_val = log_values.median()
+            data[new_col] = log_values.fillna(median_val if not pd.isna(median_val) else DEFAULT_LOG_MIC)
+        
+        # 4. Calculate MDR score
+        resistant_columns = [col for col in data.columns if col.endswith('_resistant')]
+        if resistant_columns:
+            data['mdr_score'] = data[resistant_columns].sum(axis=1)
+            data['mdr_percentage'] = (data['mdr_score'] / len(resistant_columns) * 100)
+        
+        # 5. Encode categorical features
+        # Note: Using categorical codes provides consistent encoding within uploaded dataset
+        # For production use, consider using pre-trained label encoders for cross-dataset consistency
+        categorical_cols = ['bacterial_species', 'administrative_region', 'national_site', 
+                          'local_site', 'sample_source', 'esbl']
+        
+        for col in categorical_cols:
+            if col in data.columns:
+                # Simple numeric encoding for prediction
+                data[f'{col}_encoded'] = pd.Categorical(data[col]).codes
+        
+        # 6. Create ESBL features
+        if 'esbl' in data.columns:
+            data['esbl_positive'] = (data['esbl'] == 'positive').astype(int)
+        else:
+            data['esbl_positive'] = 0
+        
+        # 7. Create regional features
+        if 'local_site' in data.columns:
+            site_counts = data.groupby('local_site').size()
+            data['site_sample_count'] = data['local_site'].map(site_counts).fillna(0)
+        else:
+            data['site_sample_count'] = 0
+        
+        if 'sample_source' in data.columns:
+            source_counts = data.groupby('sample_source').size()
+            data['source_sample_count'] = data['sample_source'].map(source_counts).fillna(0)
+        else:
+            data['source_sample_count'] = 0
+        
+        return data
+    
     def render_home(self):
         """Render home page"""
         st.markdown('<h1 class="main-header">🔬 Antibiotic Resistance Pattern Recognition System</h1>', 
@@ -458,7 +555,7 @@ class AntibioticResistanceDashboard:
                 st.success(f"✓ File uploaded: {len(user_data)} samples")
                 
                 # Show data preview
-                with st.expander("Preview Uploaded Data"):
+                with st.expander("Preview Uploaded Data (Raw)"):
                     st.dataframe(user_data.head())
                 
                 # Check if models are available
@@ -482,6 +579,17 @@ class AntibioticResistanceDashboard:
                                    format_func=lambda x: x.replace('_', ' ').title())
                 
                 if st.button("🔮 Make Predictions"):
+                    with st.spinner("Applying feature engineering..."):
+                        # Apply feature engineering to uploaded data
+                        try:
+                            user_data = self.engineer_uploaded_features(user_data)
+                            st.success("✓ Feature engineering applied")
+                        except Exception as e:
+                            st.error(f"Error during feature engineering: {str(e)}")
+                            import traceback
+                            st.code(traceback.format_exc())
+                            return
+                    
                     with st.spinner("Making predictions..."):
                         try:
                             # Load model
@@ -522,10 +630,10 @@ class AntibioticResistanceDashboard:
                                 # Prepare user data with same features
                                 missing_cols = set(feature_cols) - set(user_data.columns)
                                 if missing_cols:
-                                    # Show first 5 missing columns as sample
-                                    sample_size = 5
-                                    sample_missing = list(missing_cols)[:sample_size]
-                                    st.warning(f"⚠️ Missing columns in uploaded data: {', '.join(sample_missing)}...")
+                                    # Show warning with all missing columns
+                                    st.warning(f"⚠️ Note: {len(missing_cols)} feature(s) not found in uploaded data after feature engineering.")
+                                    with st.expander("View missing features"):
+                                        st.write(list(missing_cols))
                                     st.info("The model will use zero values for missing features.")
                                     for col in missing_cols:
                                         user_data[col] = 0
