@@ -345,7 +345,7 @@ def main():
     test_path = splits_dir / 'test.csv'
     
     # Train classifiers for each task
-    tasks = ['species', 'mar_class']  # Add 'susceptibility' if needed
+    tasks = ['species', 'mar_class', 'susceptibility']
     
     for task in tasks:
         logger.info(f"\n{'='*60}")
